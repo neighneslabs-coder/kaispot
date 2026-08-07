@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Fill in the codes{% endblock %}
+{% block heading %}{{ sheet.title }} &middot; fill in the codes{% endblock %}
+{% block toolbar %}
+<a class="btn quiet small" href="{{ url_for('stock.sheet_open', sheet_id=sheet.id) }}" target="_blank">Open the PDF</a>
+<a class="btn quiet small" href="{{ url_for('stock.sheet_list') }}">All sheets</a>
+{% endblock %}
+
+{% block content %}
+{% set done = cards | selectattr('username') | list | length %}
+
+<div class="grid three">
+  <div class="stat"><div class="label">Cards on this sheet</div>
+    <div class="stat-value">{{ cards | length }}</div></div>
+  <div class="stat {% if done %}over{% endif %}"><div class="label">With real codes</div>
+    <div class="stat-value">{{ done }}</div>
+    <div class="foot">the rest send their card number instead</div></div>
+  <div class="stat"><div class="label">Still to fill</div>
+    <div class="stat-value">{{ (cards | length) - done }}</div></div>
+</div>
+
+<div class="card">
+  <h2>Paste the list from Mikhmon</h2>
+  <div class="card-body">
+    <p class="muted small" style="margin-top:0">
+      Open the same voucher batch in Mikhmon, select the list of usernames and
+      passwords on the page, copy it, and paste it in the box. The pairs are
+      matched to card 1, card 2, card 3 and so on, in the order they are
+      printed &mdash; so paste the whole batch from the top.
+    </p>
+    <p class="muted small">
+      It copes with tabs, commas, pipes or spaces between the two, and ignores
+      heading words like <em>Username</em> and <em>Password</em>. Nothing else
+      about a card changes: its number, its price and whether it has been sold
+      all stay as they are.
+    </p>
+
+    <form method="post">
+      <div class="field">
+        <label for="pairs">Usernames and passwords</label>
+        <textarea id="pairs" name="pairs" placeholder="Srpn  474&#10;Ssvh  363&#10;Svde  385" required>{{ pasted }}</textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" name="action" value="check" class="btn quiet">Check it</button>
+        {% if result and result.checked and result.pasted %}
+        <button type="submit" name="action" value="confirm" class="btn">
+          Fill in {{ [result.pasted, result.cards] | min }} card(s)</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if result and result.checked %}
+<div class="card">
+  <div class="card-head"><h2>What was found</h2></div>
+  <div class="card-body">
+    <div class="grid three">
+      <div class="stat accent"><div class="label">Pairs read</div>
+        <div class="stat-value">{{ result.pasted }}</div></div>
+      <div class="stat {% if result.short %}short{% endif %}">
+        <div class="label">Cards left over</div>
+        <div class="stat-value">{{ result.short }}</div>
+        <div class="foot">would keep their card number</div></div>
+      <div class="stat {% if result.spare %}short{% endif %}">
+        <div class="label">Extra pairs</div>
+        <div class="stat-value">{{ result.spare }}</div>
+        <div class="foot">more than this sheet has</div></div>
+    </div>
+
+    {% if result.spare %}
+    <div class="flash warn" style="margin-top:14px">
+      You pasted more pairs than this sheet has cards. The extras are ignored
+      &mdash; check you copied the right batch before going on.
+    </div>
+    {% endif %}
+
+    {% if result.preview %}
+    <h3 style="margin-top:14px">Check these against the paper</h3>
+    <p class="small muted" style="margin:4px 0 8px">
+      Card 1 on the printed sheet should show this username. If it does not,
+      the list was pasted from the wrong batch or out of order.
+    </p>
+    <table>
+      <thead><tr><th>Card</th><th>Username</th><th>Password</th></tr></thead>
+      <tbody>
+      {% for row in result.preview %}
+        <tr><td class="code">{{ row.code }}</td>
+            <td class="code"><strong>{{ row.username }}</strong></td>
+            <td class="code">{{ row.secret or '—' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>The cards</h2><div class="spacer"></div>
+    <span class="small muted">{{ done }} of {{ cards | length }} filled in</span></div>
+  <div class="card-body tight">
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Card</th><th>Username</th><th>Password</th><th>State</th></tr></thead>
+      <tbody>
+      {% for c in cards[:120] %}
+        <tr>
+          <td class="code">{{ c.code }}</td>
+          <td class="code">{% if c.username %}<strong>{{ c.username }}</strong>
+              {% else %}<span class="muted">not filled in</span>{% endif %}</td>
+          <td class="code">{{ c.secret or '—' }}</td>
+          <td>{% if c.status == 'sold' %}<span class="chip closed">Sold</span>
+              {% elif c.status == 'dead' %}<span class="chip debt">Void</span>
+              {% else %}<span class="chip none">In stock</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if cards | length > 120 %}
+    <p class="sheet-note" style="padding:10px 16px">
+      Showing the first 120 of {{ cards | length }}.
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

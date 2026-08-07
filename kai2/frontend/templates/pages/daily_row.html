@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}{{ agent.name }} {{ day }}{% endblock %}
+{% block heading %}{{ agent.name }} &middot; {{ day | day }}{% endblock %}
+{% block toolbar %}
+<span class="chip {{ 'closed' if row.closed else 'open' }}">{{ 'Closed' if row.closed else 'Open' }}</span>
+<a class="btn quiet small" href="{{ url_for('daily.board', day=day) }}">All agents</a>
+<a class="btn quiet small" href="{{ url_for('agents.profile', agent_id=agent.id) }}">Profile</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid four">
+  <div class="stat"><div class="label">Opening</div>
+    <div class="stat-value">{{ row.opening_qty | qty }}</div>
+    <div class="foot">vouchers &middot; {{ row.opening | money }}</div></div>
+  <div class="stat"><div class="label">Given out today</div>
+    <div class="stat-value">{{ row.topup_qty | qty }}</div>
+    <div class="foot">vouchers &middot; {{ row.topup | money }}</div></div>
+  <div class="stat accent"><div class="label">Closing</div>
+    <div class="stat-value">{{ row.closing_qty | qty }}</div>
+    <div class="foot">vouchers &middot; {{ row.closing | money }}</div></div>
+  <div class="stat {% if row.variance < 0 %}short{% elif row.variance > 0 %}over{% endif %}">
+    <div class="label">Variance</div>
+    <div class="stat-value">{{ row.variance | signed_money }}</div>
+    <div class="foot">cash &minus; what she sold</div></div>
+</div>
+
+{% if row.closed %}
+<div class="flash warn">
+  This day is closed{% if row.closed_at %}, since {{ row.closed_at[:10] | day }}{% endif %}.
+  The figures are final. An administrator can reopen it, which reverses every
+  entry it made.
+</div>
+{% elif not row.counted and row.lines %}
+<div class="flash">
+  {{ agent.name }} has not marked any cards on her own screen today, so how
+  many she sold is worked back out of the cash: cash divided by the price.
+  Anything left over that does not make a whole voucher shows as the variance.
+</div>
+{% endif %}
+
+<form method="post">
+<input type="hidden" name="day" value="{{ day }}">
+
+<section class="step">
+  <div class="step-head"><span class="step-no">1</span>
+    <div><h2>Balance her vouchers</h2>
+      <div class="sub">Type the cash. Everything else is worked out.</div></div></div>
+  <div class="card-body tight">
+    {% if row.lines %}
+    <div class="table-scroll">
+    <table class="keeps-input">
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th class="fig hide-sm">Opening</th>
+          <th class="fig hide-sm">Given out</th>
+          <th class="fig">Sold</th>
+          <th class="fig" style="width:150px">Cash</th>
+          <th class="fig hide-sm">Expected</th>
+          <th class="fig">Closing</th>
+          <th class="fig">Variance</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for line in row.lines %}
+        <tr>
+          <td>
+            <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{{ line.colour or '#0b6e4f' }};margin-right:6px"></span>
+            <strong>{{ line.name }}</strong>
+            <div class="small muted">{{ line.price | money }} each{% if not line.counted and line.cash %} &middot; sold worked out from cash{% endif %}</div>
+          </td>
+          <td class="fig hide-sm">{{ line.opening_qty | qty }}</td>
+          <td class="fig hide-sm">{{ line.topup_qty | qty if line.topup_qty else '' }}</td>
+          <td class="fig"><strong>{{ line.sold_qty | qty }}</strong>
+            {% if line.void_qty %}<div class="small muted">{{ line.void_qty }} void</div>{% endif %}</td>
+          <td class="fig">
+            {% if row.closed %}
+              <strong>{{ line.cash | money }}</strong>
+            {% else %}
+              <input type="text" inputmode="numeric"
+                     name="cash_{{ line.package_id }}_{{ line.price }}"
+                     value="{{ line.cash | money if line.cash else '' }}"
+                     placeholder="0" aria-label="Cash for {{ line.name }}">
+            {% endif %}
+          </td>
+          <td class="fig hide-sm">{{ line.expected | money }}</td>
+          <td class="fig">{{ line.closing_qty | qty }}</td>
+          <td class="fig">
+            {% if line.variance < 0 %}<span class="short-text">{{ line.variance | signed_money }}</span>
+            {% elif line.variance > 0 %}<span class="over-text">{{ line.variance | signed_money }}</span>
+            {% else %}<span class="muted">0</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Totals</td>
+          <td class="fig hide-sm">{{ row.opening_qty | qty }}</td>
+          <td class="fig hide-sm">{{ row.topup_qty | qty }}</td>
+          <td class="fig">{{ row.sold_qty | qty }}</td>
+          <td class="fig">{{ row.collection | money }}</td>
+          <td class="fig hide-sm">{{ row.expected | money }}</td>
+          <td class="fig">{{ row.closing_qty | qty }}</td>
+          <td class="fig">{{ row.variance | signed_money }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty"><p>{{ agent.name }} is holding no vouchers, and none were
+      given to her today.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-no">2</span>
+    <div><h2>Note</h2><div class="sub">Anything worth remembering about today.</div></div></div>
+  <div class="step-body">
+    <div class="field">
+      <input type="text" id="note" name="note" value="{{ row.note }}"
+             placeholder="Optional" {% if row.closed %}readonly{% endif %}>
+    </div>
+  </div>
+</section>
+
+{% if not row.closed %}
+<section class="step">
+  <div class="step-head"><span class="step-no">3</span>
+    <div><h2>Finish</h2><div class="sub">Save as often as you like. Closing is final.</div></div></div>
+  <div class="step-body">
+    <div class="actions">
+      <button type="submit" name="action" value="save" class="btn quiet">Save and recalculate</button>
+      <button type="submit" name="action" value="close" class="btn">Close the day</button>
+    </div>
+    <p class="sheet-note">
+      Closing puts any shortage on {{ agent.name }}'s account as a debt,
+      credits commission of {{ agent.commission_rate | pct }} on the cash
+      received, and carries the vouchers she is still holding into tomorrow.
+    </p>
+  </div>
+</section>
+{% elif user.role == 'admin' %}
+<div class="actions" style="margin-bottom:16px">
+  <button type="submit" name="action" value="reopen" class="btn danger">Reopen this day</button>
+  <span class="small muted">Reverses everything it posted.</span>
+</div>
+{% endif %}
+</form>
+
+<div class="grid two">
+  <div class="card">
+    <div class="card-head"><h2>Give her more vouchers</h2></div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('daily.assign') }}">
+        <input type="hidden" name="day" value="{{ day }}">
+        <input type="hidden" name="agent_id" value="{{ agent.id }}">
+        <input type="hidden" name="back" value="{{ url_for('daily.row', agent_id=agent.id, day=day) }}">
+        <div class="field"><label for="pack">Package</label>
+          <select id="pack" name="package_id" required>
+            <option value="">Choose</option>
+            {% for p in office %}<option value="{{ p.id }}">{{ p.name }} &mdash; {{ p.qty | qty }} in office</option>{% endfor %}
+          </select></div>
+        <div class="field" style="max-width:180px"><label for="qty">How many vouchers</label>
+          <input type="text" inputmode="numeric" id="qty" name="qty" placeholder="0" required></div>
+        <button type="submit" class="btn">Give out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Account</h2><div class="spacer"></div>
+      <a class="btn quiet small" href="{{ url_for('agents.profile', agent_id=agent.id) }}">Full record</a></div>
+    <div class="card-body">
+      <div class="grid three">
+        <div class="stat {% if position.debt > 0 %}short{% endif %}">
+          <div class="label">Owes</div><div class="stat-value">{{ position.debt | money }}</div></div>
+        <div class="stat"><div class="label">Commission due</div>
+          <div class="stat-value">{{ position.commission_due | money }}</div></div>
+        <div class="stat"><div class="label">Earned today</div>
+          <div class="stat-value">{{ row.commission | money }}</div></div>
+      </div>
+      {% if sales %}
+      <h3 style="margin-top:14px">Recent sales</h3>
+      <table style="margin-top:6px">
+        <tbody>
+        {% for s in sales %}
+          <tr><td class="code">{{ s.code }}</td><td class="small muted">{{ s.package_name }}</td>
+              <td class="small muted">{{ s.channel or 'counter' }}</td>
+              <td class="fig">{{ s.price | money }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

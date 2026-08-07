@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Daily operations{% endblock %}
+{% block heading %}Daily operations &middot; {{ day | day }}{% endblock %}
+{% block toolbar %}
+<form method="get" class="actions">
+  <a class="btn quiet small" href="{{ url_for('daily.board', day=yesterday) }}">&larr;</a>
+  <input type="date" name="day" value="{{ day }}" aria-label="Day">
+  <button type="submit" class="btn quiet small">Show</button>
+  <a class="btn quiet small" href="{{ url_for('daily.board', day=tomorrow) }}">&rarr;</a>
+</form>
+{% endblock %}
+
+{% block content %}
+{% if outstanding %}
+<div class="flash warn">
+  {{ outstanding }} earlier day(s) are still open. A day left open never
+  balances itself &mdash; close them before the stock figures drift.
+</div>
+{% endif %}
+
+<div class="grid four">
+  <div class="stat accent"><div class="label">Collected today</div>
+    <div class="stat-value">{{ totals.collection | money }}</div>
+    <div class="foot">from {{ totals.agents }} agent(s)</div></div>
+  <div class="stat"><div class="label">Given out today</div>
+    <div class="stat-value">{{ totals.topup | money }}</div>
+    <div class="foot">top-up value</div></div>
+  <div class="stat short"><div class="label">Shortage today</div>
+    <div class="stat-value">{{ totals.shortage | money }}</div>
+    <div class="foot">cash less than vouchers sold</div></div>
+  <div class="stat"><div class="label">Vouchers in the field</div>
+    <div class="stat-value">{{ totals.closing_qty | qty }}</div>
+    <div class="foot">{{ totals.closed }} of {{ totals.agents }} days closed</div></div>
+</div>
+
+<form method="post">
+<input type="hidden" name="day" value="{{ day }}">
+<div class="card">
+  <div class="card-head">
+    <h2>Agents</h2><div class="spacer"></div>
+    <span class="small muted">closing = opening + given out &minus; sold</span>
+  </div>
+  <div class="card-body tight">
+    {% if board %}
+    <div class="table-scroll">
+    <table class="keeps-input">
+      <thead>
+        <tr>
+          <th>Sales agent</th>
+          <th class="fig hide-sm">Opening</th>
+          <th class="fig hide-sm">Given out</th>
+          <th class="fig">Sold</th>
+          <th class="fig" style="width:150px">Cash</th>
+          <th class="fig">Closing</th>
+          <th class="fig">Variance</th>
+          <th class="hide-sm">Day</th>
+          <th class="hide-sm"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in board %}
+        <tr>
+          <td>
+            <a class="row-link" href="{{ url_for('daily.row', agent_id=row.agent.id, day=day) }}">{{ row.name }}</a>
+            <div class="small muted">{{ row.code }}{% if row.station %} &middot; {{ row.station }}{% endif %}
+              {% if row.debt > 0 %}<span class="chip debt">owes {{ row.debt | money }}</span>{% endif %}</div>
+          </td>
+          <td class="fig hide-sm">{{ row.opening_qty | qty }}</td>
+          <td class="fig hide-sm">{{ row.topup_qty | qty if row.topup_qty else '' }}</td>
+          <td class="fig">{{ row.sold_qty | qty }}</td>
+          <td class="fig">
+            {% if row.closed %}
+              <strong>{{ row.collection | money }}</strong>
+            {% else %}
+              <input type="text" inputmode="numeric" name="total_{{ row.agent.id }}"
+                     value="{{ row.collection | money if row.collection else '' }}"
+                     placeholder="0" aria-label="Cash from {{ row.name }}">
+            {% endif %}
+          </td>
+          <td class="fig">{{ row.closing_qty | qty }}</td>
+          <td class="fig">
+            {% if row.variance < 0 %}<span class="short-text">{{ row.variance | signed_money }}</span>
+            {% elif row.variance > 0 %}<span class="over-text">{{ row.variance | signed_money }}</span>
+            {% else %}<span class="muted">0</span>{% endif %}
+          </td>
+          <td class="hide-sm">
+            {% if row.closed %}<span class="chip closed">Closed</span>
+            {% elif row.saved %}<span class="chip open">Open</span>
+            {% else %}<span class="chip none">Not started</span>{% endif %}
+          </td>
+          <td class="hide-sm"><a class="btn quiet small" href="{{ url_for('daily.row', agent_id=row.agent.id, day=day) }}">
+            {{ 'View' if row.closed else 'Open' }}</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Totals</td>
+          <td class="fig hide-sm">{{ totals.opening_qty | qty }}</td>
+          <td class="fig hide-sm">{{ totals.topup_qty | qty }}</td>
+          <td class="fig">{{ totals.sold_qty | qty }}</td>
+          <td class="fig">{{ totals.collection | money }}</td>
+          <td class="fig">{{ totals.closing_qty | qty }}</td>
+          <td class="fig short-text">{{ (0 - totals.shortage) | signed_money }}</td>
+          <td class="hide-sm"></td><td class="hide-sm"></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty"><p>No active agents yet.</p>
+      <a class="btn" href="{{ url_for('agents.new') }}">Add a sales agent</a></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if board %}
+<div class="actions" style="margin-bottom:16px">
+  <button type="submit" class="btn">Save collections</button>
+  <span class="small muted">Blank boxes are left alone. Open an agent to split
+    the cash across packages and close her day.</span>
+</div>
+{% endif %}
+</form>
+
+<div class="grid two">
+  <div class="card">
+    <div class="card-head"><h2>Give out stock</h2><div class="spacer"></div>
+      <span class="small muted">this becomes the top-up</span></div>
+    <div class="card-body">
+      {% if agents and packages %}
+      <form method="post" action="{{ url_for('daily.assign') }}">
+        <input type="hidden" name="day" value="{{ day }}">
+        <input type="hidden" name="back" value="{{ url_for('daily.board', day=day) }}">
+        <div class="field-row">
+          <div class="field"><label for="a_agent">Agent</label>
+            <select id="a_agent" name="agent_id" required>
+              <option value="">Choose</option>
+              {% for a in agents %}<option value="{{ a.id }}">{{ a.code }} &mdash; {{ a.name }}</option>{% endfor %}
+            </select></div>
+          <div class="field"><label for="a_pack">Package</label>
+            <select id="a_pack" name="package_id" required>
+              <option value="">Choose</option>
+              {% for p in office %}<option value="{{ p.id }}">{{ p.name }} &mdash; {{ p.qty | qty }} in office</option>{% endfor %}
+            </select></div>
+        </div>
+        <div class="field" style="max-width:180px"><label for="a_qty">How many</label>
+          <input type="text" inputmode="numeric" id="a_qty" name="qty" placeholder="0" required></div>
+        <button type="submit" class="btn">Give out</button>
+      </form>
+      {% else %}
+      <div class="empty"><p>Add an agent and a package first.</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Voucher stock in the office</h2><div class="spacer"></div>
+      <a class="btn quiet small" href="{{ url_for('stock.index') }}">Stock</a></div>
+    <div class="card-body tight">
+      {% if office %}
+      <table>
+        <thead><tr><th>Package</th><th class="fig">Price</th><th class="fig">In office</th><th class="fig">Value</th></tr></thead>
+        <tbody>
+        {% for p in office %}
+          <tr><td><strong>{{ p.name }}</strong></td><td class="fig">{{ p.price | money }}</td>
+              <td class="fig">{{ p.qty | qty }}</td><td class="fig">{{ p.value | money }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<div class="empty"><p>No vouchers in stock.</p>
+        <a class="btn" href="{{ url_for('stock.manual') }}">Take some in</a></div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
