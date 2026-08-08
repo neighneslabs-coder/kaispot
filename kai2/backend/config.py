@@ -23,7 +23,16 @@ APP_VERSION = "3.0"
 CURRENCY = "UGX"
 
 HOST = os.environ.get("KAISPOT_HOST", "0.0.0.0")
-PORT = int(os.environ.get("KAISPOT_PORT", "8080"))
+
+# Hosting services hand the port over in PORT and kill anything that does not
+# listen on it. KAISPOT_PORT stays first so the office PC is unaffected.
+PORT = int(os.environ.get("KAISPOT_PORT")
+           or os.environ.get("PORT")
+           or 8080)
+
+# True when running on a server rather than the office PC: no browser to open,
+# and the LAN address printed at startup means nothing.
+HOSTED = bool(os.environ.get("PORT") and not os.environ.get("KAISPOT_PORT"))
 
 MAX_UPLOAD_MB = 25
 
