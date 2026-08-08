@@ -29,7 +29,7 @@ if MISSING:
 
 from backend import seed
 from backend.app import create_app
-from backend.config import HOST, PORT
+from backend.config import HOST, HOSTED, PORT
 
 
 def lan_address() -> str:
@@ -71,12 +71,21 @@ def main() -> None:
         print("Sample agents added.")
 
     app = create_app()
-    address = lan_address()
-    banner(address, fresh)
+    if HOSTED:
+        print(f"KAISPOT starting on port {PORT}")
+        if fresh:
+            print("First run: sign in with admin / admin and change it at once.")
+    else:
+        banner(lan_address(), fresh)
 
-    if "--no-browser" not in sys.argv:
-        threading.Timer(1.2,
-                        lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
+    if "--no-browser" not in sys.argv and not HOSTED:
+        # A headless server has no browser, and webbrowser.open raises there.
+        def open_browser() -> None:
+            try:
+                webbrowser.open(f"http://localhost:{PORT}")
+            except Exception:
+                pass
+        threading.Timer(1.2, open_browser).start()
 
     try:
         from waitress import serve
