@@ -1,0 +1,5 @@
+# Every one of these is pure Python with no compiled extension, so pip will
+# not need a C compiler or Visual Studio Build Tools on an office PC.
+Flask>=3.0,<4.0
+waitress>=3.0
+pypdf>=4.0
