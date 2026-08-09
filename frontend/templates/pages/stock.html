@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Stock{% endblock %}
+{% block toolbar %}
+<a class="btn quiet small" href="{{ url_for('stock.manual') }}">Add record by hand</a>
+<a class="btn small" href="{{ url_for('stock.sheet_list') }}">Send a sheet to an agent</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid four">
+  <div class="stat"><div class="label">Registered</div>
+    <div class="stat-value">{{ totals.registered | qty }}</div>
+    <div class="foot">every voucher ever taken in</div></div>
+  <div class="stat"><div class="label">On the shelf</div>
+    <div class="stat-value">{{ totals.office_qty | qty }}</div>
+    <div class="foot">{{ totals.office_value | money }} in the office</div></div>
+  <div class="stat accent"><div class="label">Out with agents</div>
+    <div class="stat-value">{{ totals.agent_qty | qty }}</div>
+    <div class="foot">{{ totals.agent_value | money }} unsold in the field</div></div>
+  <div class="stat"><div class="label">Sold</div>
+    <div class="stat-value">{{ totals.sold_qty | qty }}</div>
+    <div class="foot">{{ totals.sold_value | money }}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Where every voucher is</h2><div class="spacer"></div>
+    <span class="small muted">on the shelf + with agents + sold + void = registered</span>
+  </div>
+  <div class="card-body tight">
+    {% if totals.registered %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Package</th><th class="fig">Registered at</th>
+                 <th class="fig">On the shelf</th><th class="fig">With agents</th>
+                 <th class="fig">Sold</th><th class="fig hide-sm">Void</th>
+                 <th class="fig">Registered</th><th class="fig hide-sm">Unsold value</th></tr></thead>
+      <tbody>
+      {% for p in overview %}
+        {% if p.total %}
+        <tr>
+          <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:{{ p.colour }};margin-right:7px"></span>
+              <strong>{{ p.name }}</strong>
+              {% if not p.active %}<span class="chip none">Off</span>{% endif %}
+              {% if p.price_runs > 1 %}
+              <div class="small muted">{{ p.price_runs }} price runs in stock</div>{% endif %}</td>
+          <td class="fig">
+            {% if p.low_price == p.high_price %}{{ p.low_price | money }}
+            {% else %}{{ p.low_price | money }}&ndash;{{ p.high_price | money }}{% endif %}
+            {% if p.low_price != p.price %}
+            <div class="small muted">now {{ p.price | money }}</div>{% endif %}
+          </td>
+          <td class="fig">{{ p.office_qty | qty }}</td>
+          <td class="fig"><strong>{{ p.agent_qty | qty }}</strong></td>
+          <td class="fig">{{ p.sold_qty | qty }}</td>
+          <td class="fig hide-sm">{% if p.void_qty %}<span class="short-text">{{ p.void_qty | qty }}</span>{% else %}0{% endif %}</td>
+          <td class="fig">{{ p.total | qty }}</td>
+          <td class="fig hide-sm">{{ (p.office_value + p.agent_value) | money }}</td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td>Totals</td><td class="fig"></td>
+          <td class="fig">{{ totals.office_qty | qty }}</td>
+          <td class="fig">{{ totals.agent_qty | qty }}</td>
+          <td class="fig">{{ totals.sold_qty | qty }}</td>
+          <td class="fig hide-sm">{{ totals.void_qty | qty }}</td>
+          <td class="fig">{{ totals.registered | qty }}</td>
+          <td class="fig hide-sm">{{ (totals.office_value + totals.agent_value) | money }}</td></tr>
+      </tfoot>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <p>No vouchers registered yet.</p>
+      <p class="small">Send a sheet to an agent, or type the numbers off a
+        printed sheet on the Add record page.</p>
+      <div class="actions" style="justify-content:center">
+        <a class="btn" href="{{ url_for('stock.sheet_list') }}">Send a sheet</a>
+        <a class="btn quiet" href="{{ url_for('stock.manual') }}">Add record by hand</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>In the field</h2><div class="spacer"></div>
+    <span class="small muted">what each agent is carrying now</span></div>
+  <div class="card-body tight">
+    {% if field %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Agent</th><th class="fig">Holding</th>
+                 <th class="fig">Worth</th><th class="fig">Sold</th>
+                 <th class="fig hide-sm">Sold value</th>
+                 <th class="fig hide-sm">Void</th><th></th></tr></thead>
+      <tbody>
+      {% for a in field %}
+        <tr>
+          <td><a class="row-link" href="{{ url_for('agents.profile', agent_id=a.id) }}">{{ a.name }}</a>
+              <div class="small muted">{{ a.code }}{% if a.station %} &middot; {{ a.station }}{% endif %}</div></td>
+          <td class="fig"><strong>{{ a.holding | qty }}</strong></td>
+          <td class="fig">{{ a.holding_value | money }}</td>
+          <td class="fig">{{ a.sold | qty }}</td>
+          <td class="fig hide-sm">{{ a.sold_value | money }}</td>
+          <td class="fig hide-sm">{% if a.void %}<span class="short-text">{{ a.void | qty }}</span>{% else %}0{% endif %}</td>
+          <td><a class="btn quiet small" href="{{ url_for('daily.row', agent_id=a.id) }}">Balance</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td>Totals</td>
+        <td class="fig">{{ totals.agent_qty | qty }}</td>
+        <td class="fig">{{ totals.agent_value | money }}</td>
+        <td class="fig">{{ totals.sold_qty | qty }}</td>
+        <td class="fig hide-sm">{{ totals.sold_value | money }}</td>
+        <td class="fig hide-sm">{{ totals.void_qty | qty }}</td><td></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}<div class="empty"><p>No active agents.</p></div>{% endif %}
+  </div>
+</div>
+
+{% if totals.office_qty %}
+<div class="card">
+  <div class="card-head"><h2>Give out from the shelf</h2><div class="spacer"></div>
+    <span class="small muted">for vouchers not sent as a sheet</span></div>
+  <div class="card-body tight">
+    <table>
+      <thead><tr><th>Package</th><th class="fig">Price</th><th class="fig">On the shelf</th><th class="fig">Value</th></tr></thead>
+      <tbody>
+      {% for p in office %}{% if p.qty %}
+        <tr><td><strong>{{ p.name }}</strong></td><td class="fig">{{ p.price | money }}</td>
+            <td class="fig">{{ p.qty | qty }}</td><td class="fig">{{ p.value | money }}</td></tr>
+      {% endif %}{% endfor %}
+      </tbody>
+    </table>
+    <p class="sheet-note" style="padding:10px 16px">
+      Hand these out from <a href="{{ url_for('daily.board') }}">Daily operations</a>.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>What came in</h2><div class="spacer"></div>
+    <span class="small muted">every batch registered</span></div>
+  <div class="card-body tight">
+    {% if intakes %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Date</th><th>How</th><th>Package</th><th class="hide-sm">Reference</th>
+                 <th class="fig">Cards</th><th class="fig">Price</th>
+                 <th class="fig hide-sm">Skipped</th><th class="fig">Value</th></tr></thead>
+      <tbody>
+      {% for i in intakes %}
+        <tr><td>{{ i.received_on | day }}</td>
+            <td>{% if i.kind == 'pdf' %}<span class="chip closed">Sheet</span>
+                {% else %}<span class="chip none">By hand</span>{% endif %}</td>
+            <td><strong>{{ i.package }}</strong></td>
+            <td class="small muted hide-sm">{{ i.reference or i.filename }}</td>
+            <td class="fig">{{ i.accepted | qty }}</td>
+            <td class="fig">{{ i.price | money }}</td>
+            <td class="fig hide-sm">{% if i.duplicates %}<span class="short-text">{{ i.duplicates | qty }}</span>{% else %}0{% endif %}</td>
+            <td class="fig">{{ (i.accepted * i.price) | money }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty"><p>Nothing taken in yet.</p></div>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Given out recently</h2></div>
+  <div class="card-body tight">
+    {% if assignments %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Date</th><th>Agent</th><th>Package</th>
+                 <th class="fig">Vouchers</th><th class="fig">Value</th></tr></thead>
+      <tbody>
+      {% for a in assignments %}
+        <tr><td>{{ a.assigned_on | day }}</td><td>{{ a.agent }}</td>
+            <td><strong>{{ a.package }}</strong></td>
+            <td class="fig">{{ a.qty | qty }}</td><td class="fig">{{ a.value | money }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty"><p>Nothing given out yet.</p></div>{% endif %}
+  </div>
+</div>
+{% endblock %}
