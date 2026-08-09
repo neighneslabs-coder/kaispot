@@ -94,6 +94,17 @@ class transaction:
 # NULL column to a table that already has rows unless it knows what to put in
 # them.
 NEW_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "agents": [
+        # The building or site this agent works. Nullable, because an agent
+        # can be roving or newly hired before a site is assigned.
+        ("building_id", "INTEGER REFERENCES buildings(id) ON DELETE SET NULL"),
+    ],
+    "assignments": [
+        # Which batch this hand-over came from. Without it, removing a batch
+        # registered straight to an agent would leave her top-up standing for
+        # cards that no longer exist.
+        ("intake_id", "INTEGER"),
+    ],
     "vouchers": [
         # The username printed on the card. The code column stays as the
         # card's identity - PLAT-0805-014, matching the [14] on the paper -
@@ -121,6 +132,24 @@ NEW_COLUMNS: dict[str, list[tuple[str, str]]] = {
 # because cash cannot be split between denominations on its own: 45,000
 # against Daily at 2,000 and Weekly at 10,000 has no single answer.
 NEW_TABLES = {
+    # The sites the business sells in: blocks, hostels, arcades. One agent
+    # covers one building, and a building keeps its own record even after the
+    # agent covering it changes.
+    "buildings": """
+        CREATE TABLE IF NOT EXISTS buildings (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            name          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+            area          TEXT    NOT NULL DEFAULT '',
+            address       TEXT    NOT NULL DEFAULT '',
+            contact_name  TEXT    NOT NULL DEFAULT '',
+            contact_phone TEXT    NOT NULL DEFAULT '',
+            units         INTEGER NOT NULL DEFAULT 0,
+            router        TEXT    NOT NULL DEFAULT '',
+            notes         TEXT    NOT NULL DEFAULT '',
+            active        INTEGER NOT NULL DEFAULT 1,
+            created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+        )
+    """,
     "daily_lines": """
         CREATE TABLE IF NOT EXISTS daily_lines (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,6 +171,7 @@ NEW_TABLES = {
 }
 
 NEW_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS ix_agents_building ON agents(building_id)",
     "CREATE INDEX IF NOT EXISTS ix_daily_lines ON daily_lines(agent_id, day)",
     "CREATE INDEX IF NOT EXISTS ix_daily_lines_day ON daily_lines(day)",
 ]
@@ -181,6 +211,25 @@ def migrate(conn: sqlite3.Connection | None = None) -> list[str]:
 
         for statement in NEW_INDEXES:
             conn.execute(statement)
+
+        # Anything already typed into the old `station` box becomes a real
+        # building, and its agents are linked to it. Done once: after this
+        # the buildings table is the record and station is only a fallback.
+        if ("agents" in present
+                and "building_id" in _columns_of(conn, "agents")):
+            stations = [r[0] for r in conn.execute(
+                "SELECT DISTINCT TRIM(station) FROM agents "
+                "WHERE TRIM(station) <> '' AND building_id IS NULL")]
+            for name in stations:
+                conn.execute("INSERT INTO buildings (name) VALUES (?) "
+                             "ON CONFLICT(name) DO NOTHING", (name,))
+                conn.execute(
+                    "UPDATE agents SET building_id = "
+                    "  (SELECT id FROM buildings WHERE name = ?) "
+                    "WHERE TRIM(station) = ? AND building_id IS NULL",
+                    (name, name))
+            if stations:
+                changed.append(f"{len(stations)} station(s) became buildings")
     finally:
         if owned:
             conn.close()
@@ -204,6 +253,13 @@ def backup() -> str:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     target = BACKUP_DIR / f"kaispot-{stamp}.db"
+    # Two deletions inside the same second would otherwise share a filename,
+    # and the second backup would quietly overwrite the first - losing the
+    # very copy someone would want to go back to.
+    suffix = 2
+    while target.exists():
+        target = BACKUP_DIR / f"kaispot-{stamp}-{suffix}.db"
+        suffix += 1
     source = connect()
     try:
         dest = sqlite3.connect(target)

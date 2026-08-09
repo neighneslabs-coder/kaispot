@@ -39,10 +39,11 @@ def create_app() -> Flask:
                                  currency=config.CURRENCY,
                                  role_labels=auth.ROLE_LABELS)
 
-    from backend.routes import (agents, daily, dashboard, packages, pos,
-                                reports, settings, sign_in, stock)
-    for module in (sign_in, dashboard, daily, agents, packages, stock, pos,
-                   reports, settings):
+    from backend.routes import (agents, buildings, daily, dashboard,
+                                packages, pos, reports, settings,
+                                sign_in, stock)
+    for module in (sign_in, dashboard, daily, agents, buildings, packages,
+                   stock, pos, reports, settings):
         app.register_blueprint(module.bp)
 
     @app.context_processor
