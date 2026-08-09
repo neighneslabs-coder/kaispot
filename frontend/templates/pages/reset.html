@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Start afresh{% endblock %}
+{% block heading %}Start afresh{% endblock %}
+{% block toolbar %}
+<a class="btn quiet small" href="{{ url_for('settings.index') }}">Back to settings</a>
+{% endblock %}
+
+{% block content %}
+<div class="flash error">
+  This empties the app. It is meant for clearing out trial data before the real
+  work starts &mdash; not for tidying up. A backup is written first, but read
+  the list below before going on.
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>What is in the app now</h2></div>
+  <div class="card-body tight">
+    <table>
+      <thead><tr><th>Records</th><th class="fig">Count</th></tr></thead>
+      <tbody>
+      {% for row in contents %}
+        <tr><td>{{ row.label }}</td>
+            <td class="fig">{% if row.count %}<strong>{{ row.count | qty }}</strong>
+                {% else %}<span class="muted">0</span>{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><td>Total</td>
+        <td class="fig">{{ contents | sum(attribute='count') | qty }}</td></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="max-width:620px">
+  <h2>Empty it</h2>
+  <div class="card-body">
+    <form method="post" onsubmit="return confirm('Empty the app? A backup will be saved first.')">
+      <p class="muted small" style="margin-top:0">Anything ticked here survives.</p>
+      <div class="field"><label class="check">
+        <input type="checkbox" name="keep_packages" value="1" checked>
+        Keep the packages</label>
+        <div class="hint">Your denominations and prices. Usually worth keeping.</div></div>
+      <div class="field"><label class="check">
+        <input type="checkbox" name="keep_buildings" value="1" checked>
+        Keep the buildings</label>
+        <div class="hint">The sites you sell in. They rarely change.</div></div>
+      <div class="field"><label class="check">
+        <input type="checkbox" name="keep_users" value="1">
+        Keep the agents and their sign-ins</label>
+        <div class="hint">Leave this unticked to remove the agents too. Your
+          own administrator account is never removed either way.</div></div>
+
+      <div class="field" style="max-width:240px">
+        <label for="confirm">Type <strong>ERASE</strong> to confirm</label>
+        <input type="text" id="confirm" name="confirm" placeholder="ERASE"
+               autocapitalize="characters" required>
+      </div>
+      <button type="submit" class="btn danger">Empty the app</button>
+      <p class="sheet-note">
+        The backup lands in the <code>backups</code> folder. To undo this, stop
+        the server and copy that file over <code>data\\kaispot.db</code>.
+      </p>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Voucher sold{% endblock %}
+{% block heading %}Voucher sold{% endblock %}
+{% block toolbar %}
+<a class="btn quiet small" href="{{ url_for('pos.home', agent=agent.id) }}">Back to selling</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2>{{ result.package.name }} &middot; {{ result.package.price | money }}</h2>
+    <div class="spacer"></div>
+    <span class="small muted">{{ result.remaining | qty }} left in your stock</span>
+  </div>
+  <div class="card-body">
+    <div class="voucher-code">{{ result.voucher.code }}</div>
+    {% if result.voucher.secret %}
+    <p style="text-align:center;margin:10px 0 0">
+      <span class="eyebrow">Password</span>
+      <span class="code" style="font-size:1.1rem;display:block">{{ result.voucher.secret }}</span>
+    </p>
+    {% endif %}
+
+    <h3 style="margin-top:18px">Send it to the customer</h3>
+    <p class="small muted" style="margin:4px 0 10px">
+      These open the app already on your phone with the message written out.
+      Nothing is sent by the server.
+    </p>
+    <div class="share-grid">
+      <a class="btn wa big" href="{{ result.links.whatsapp }}" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="btn tg big" href="{{ result.links.telegram }}" target="_blank" rel="noopener">Telegram</a>
+      <a class="btn quiet big" href="{{ result.links.sms }}">SMS</a>
+    </div>
+    {% if not result.links.phone %}
+    <p class="sheet-note">No number was chosen, so WhatsApp will ask you who to
+      send it to.</p>
+    {% endif %}
+
+    <h3 style="margin-top:18px">The message</h3>
+    <div class="msg-box">{{ result.message }}</div>
+
+    <div class="actions" style="margin-top:16px">
+      <a class="btn" href="{{ url_for('pos.home', agent=agent.id) }}">Sell another</a>
+      <form method="post" action="{{ url_for('pos.void', voucher_id=result.voucher.id) }}">
+        <input type="hidden" name="agent_id" value="{{ agent.id }}">
+        <button type="submit" class="btn quiet">Undo this sale</button>
+      </form>
+    </div>
+    <p class="sheet-note">
+      Undo only works today, and only if the customer never got the code.
+    </p>
+  </div>
+</div>
+{% endblock %}

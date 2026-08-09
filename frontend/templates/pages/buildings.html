@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Buildings{% endblock %}
+{% block heading %}Buildings &middot; {{ start | day }} to {{ end | day }}{% endblock %}
+{% block toolbar %}
+<form method="get" class="actions">
+  <input type="date" name="start" value="{{ start }}" aria-label="From">
+  <input type="date" name="end" value="{{ end }}" aria-label="To">
+  <button type="submit" class="btn quiet small">Show</button>
+</form>
+<a class="btn small" href="{{ url_for('buildings.new') }}">Add a building</a>
+{% endblock %}
+
+{% block content %}
+{% set total_collection = (buildings | sum(attribute='collection')) + unposted.collection %}
+{% set total_agents = (buildings | sum(attribute='agents')) + unposted.agents %}
+
+<div class="grid four">
+  <div class="stat"><div class="label">Buildings</div>
+    <div class="stat-value">{{ buildings | length }}</div>
+    <div class="foot">{{ buildings | sum(attribute='units') | qty }} units covered</div></div>
+  <div class="stat"><div class="label">Agents posted</div>
+    <div class="stat-value">{{ total_agents }}</div>
+    <div class="foot">{{ unposted.agents }} not posted anywhere</div></div>
+  <div class="stat accent"><div class="label">Collected</div>
+    <div class="stat-value">{{ total_collection | money }}</div>
+    <div class="foot">over the period shown</div></div>
+  <div class="stat short"><div class="label">Shortage</div>
+    <div class="stat-value">{{ ((buildings | sum(attribute='shortage')) + unposted.shortage) | money }}</div></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>How each site is trading</h2><div class="spacer"></div>
+    <a class="btn quiet small" href="{{ url_for('reports.export', what='buildings', start=start, end=end) }}">CSV</a></div>
+  <div class="card-body tight">
+    {% if buildings %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Building</th><th class="hide-sm">Area</th>
+                 <th class="fig hide-sm">Units</th><th class="fig">Agents</th>
+                 <th class="fig">Sold</th><th class="fig">Collected</th>
+                 <th class="fig">Shortage</th><th class="fig hide-sm">Per unit</th></tr></thead>
+      <tbody>
+      {% for b in buildings %}
+        <tr>
+          <td><a class="row-link" href="{{ url_for('buildings.profile', building_id=b.id) }}">{{ b.name }}</a>
+              {% if not b.active %}<span class="chip none">Off</span>{% endif %}</td>
+          <td class="small muted hide-sm">{{ b.area }}</td>
+          <td class="fig hide-sm">{{ b.units | qty if b.units else '' }}</td>
+          <td class="fig">{{ b.agents }}</td>
+          <td class="fig">{{ b.sold_qty | qty }}</td>
+          <td class="fig"><strong>{{ b.collection | money }}</strong></td>
+          <td class="fig">{% if b.shortage %}<span class="short-text">{{ b.shortage | money }}</span>{% else %}0{% endif %}</td>
+          <td class="fig hide-sm">
+            {% if b.units %}{{ (b.collection // b.units) | money }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+      {% endfor %}
+      {% if unposted.agents %}
+        <tr style="opacity:.75">
+          <td><em>Not posted to a building</em>
+              <div class="small muted">give these agents a building on their profile</div></td>
+          <td class="hide-sm"></td><td class="fig hide-sm"></td>
+          <td class="fig">{{ unposted.agents }}</td>
+          <td class="fig">{{ unposted.sold_qty | qty }}</td>
+          <td class="fig">{{ unposted.collection | money }}</td>
+          <td class="fig">{% if unposted.shortage %}<span class="short-text">{{ unposted.shortage | money }}</span>{% else %}0{% endif %}</td>
+          <td class="fig hide-sm"></td>
+        </tr>
+      {% endif %}
+      </tbody>
+      <tfoot><tr><td>Totals</td><td class="hide-sm"></td><td class="fig hide-sm"></td>
+        <td class="fig">{{ total_agents }}</td>
+        <td class="fig">{{ ((buildings | sum(attribute='sold_qty')) + unposted.sold_qty) | qty }}</td>
+        <td class="fig">{{ total_collection | money }}</td>
+        <td class="fig short-text">{{ ((buildings | sum(attribute='shortage')) + unposted.shortage) | money }}</td>
+        <td class="fig hide-sm"></td></tr></tfoot>
+    </table>
+    </div>
+    {% else %}
+    <div class="empty">
+      <p>No buildings yet.</p>
+      <p class="small">A building is a site you sell in. Posting agents to one
+        lets you see whether a weak month is the place or the person.</p>
+      <a class="btn" href="{{ url_for('buildings.new') }}">Add a building</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if buildings %}
+{% set peak = buildings | map(attribute='collection') | max %}
+{% if peak %}
+<div class="card">
+  <div class="card-head"><h2>Side by side</h2></div>
+  <div class="card-body">
+    <div class="bars" style="height:150px">
+      {% for b in buildings[:12] %}
+      <div class="bar">
+        <i style="height:{{ (100 * b.collection / peak) | round(0,'ceil') | int }}%"
+           title="{{ b.name }}: {{ b.collection | money }}"></i>
+        <span>{{ b.name[:9] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

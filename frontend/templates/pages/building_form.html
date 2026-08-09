@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:680px">
+  <h2>{{ heading }}</h2>
+  <div class="card-body">
+    <form method="post">
+      <div class="field-row">
+        <div class="field"><label for="name">Building name</label>
+          <input type="text" id="name" name="name" value="{{ building.name or '' }}"
+                 placeholder="Kireka Tower" required></div>
+        <div class="field"><label for="area">Area</label>
+          <input type="text" id="area" name="area" value="{{ building.area or '' }}"
+                 placeholder="Kireka"></div>
+      </div>
+      <div class="field"><label for="address">Address</label>
+        <input type="text" id="address" name="address" value="{{ building.address or '' }}"
+               placeholder="Plot 14, Jinja Road"></div>
+      <div class="field-row three">
+        <div class="field"><label for="units">Units in the building</label>
+          <input type="text" inputmode="numeric" id="units" name="units"
+                 value="{{ building.units or '' }}" placeholder="0">
+          <div class="hint">Rooms or households. Used to show takings per unit.</div></div>
+        <div class="field"><label for="contact_name">Caretaker or landlord</label>
+          <input type="text" id="contact_name" name="contact_name" value="{{ building.contact_name or '' }}"></div>
+        <div class="field"><label for="contact_phone">Their phone</label>
+          <input type="tel" id="contact_phone" name="contact_phone" value="{{ building.contact_phone or '' }}"></div>
+      </div>
+      <div class="field"><label for="router">Router or access point</label>
+        <input type="text" id="router" name="router" value="{{ building.router or '' }}"
+               placeholder="MikroTik hAP ac2 - 192.168.88.1">
+        <div class="hint">Which device serves this site, for when something breaks.</div></div>
+      <div class="field"><label for="notes">Notes</label>
+        <textarea id="notes" name="notes" style="min-height:80px">{{ building.notes or '' }}</textarea></div>
+      {% if building.id %}
+      <div class="field"><label class="check">
+        <input type="checkbox" name="active" value="1" {% if building.active %}checked{% endif %}>
+        Active</label></div>
+      {% endif %}
+      <div class="actions">
+        <button type="submit" class="btn">Save building</button>
+        <a class="btn quiet" href="{{ url_for('buildings.index') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

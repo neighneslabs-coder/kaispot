@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ building.name }}{% endblock %}
+{% block heading %}{{ building.name }}{% endblock %}
+{% block toolbar %}
+<a class="btn quiet small" href="{{ url_for('buildings.edit', building_id=building.id) }}">Edit</a>
+<a class="btn quiet small" href="{{ url_for('buildings.index') }}">All buildings</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid four">
+  <div class="stat accent"><div class="label">Collected</div>
+    <div class="stat-value">{{ (figures.collection if figures else 0) | money }}</div>
+    <div class="foot">{{ start | day }} to {{ end | day }}</div></div>
+  <div class="stat"><div class="label">Vouchers sold</div>
+    <div class="stat-value">{{ (figures.sold_qty if figures else 0) | qty }}</div></div>
+  <div class="stat"><div class="label">Stock on site</div>
+    <div class="stat-value">{{ stock.value | money }}</div>
+    <div class="foot">{{ stock.qty | qty }} vouchers with these agents</div></div>
+  <div class="stat {% if figures and figures.shortage %}short{% endif %}">
+    <div class="label">Shortage</div>
+    <div class="stat-value">{{ (figures.shortage if figures else 0) | money }}</div></div>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <div class="card-head"><h2>The site</h2></div>
+    <div class="card-body">
+      <table>
+        <tbody>
+          <tr><td class="muted">Area</td><td>{{ building.area or '—' }}</td></tr>
+          <tr><td class="muted">Address</td><td>{{ building.address or '—' }}</td></tr>
+          <tr><td class="muted">Units</td><td>{{ building.units | qty if building.units else '—' }}</td></tr>
+          <tr><td class="muted">Caretaker</td><td>{{ building.contact_name or '—' }}</td></tr>
+          <tr><td class="muted">Phone</td><td class="code">{{ building.contact_phone or '—' }}</td></tr>
+          <tr><td class="muted">Router</td><td>{{ building.router or '—' }}</td></tr>
+        </tbody>
+      </table>
+      {% if building.units and figures and figures.collection %}
+      <p class="sheet-note">
+        That works out at {{ (figures.collection // building.units) | money }}
+        per unit over this period.
+      </p>
+      {% endif %}
+      {% if building.notes %}
+      <h3 style="margin-top:14px">Notes</h3>
+      <p class="small">{{ building.notes }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Agents here</h2></div>
+    <div class="card-body tight">
+      {% if agents %}
+      <table>
+        <thead><tr><th>Agent</th><th>Code</th><th></th></tr></thead>
+        <tbody>
+        {% for a in agents %}
+          <tr><td><a class="row-link" href="{{ url_for('agents.profile', agent_id=a.id) }}">{{ a.name }}</a>
+                  {% if not a.active %}<span class="chip none">Off</span>{% endif %}</td>
+              <td class="small muted">{{ a.code }}</td>
+              <td><a class="btn quiet small" href="{{ url_for('daily.row', agent_id=a.id) }}">Balance</a></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty"><p>No agents posted here.</p>
+        <p class="small">Set the building on an agent's profile.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Day by day</h2><div class="spacer"></div>
+    <span class="small muted">everyone at this site together</span></div>
+  <div class="card-body tight">
+    {% if history %}
+    {% set peak = history | map(attribute='collection') | max %}
+    {% if peak %}
+    <div style="padding:14px 16px 4px">
+      <div class="spark" style="height:64px">
+        {% for h in history | reverse %}
+          <div style="height:{
+            { 
+                (100 * h.collection / peak) | round(0,'ceil') | int
+             }
+            }%"
+               title="{{ h.day }}: {{ h.collection | money }}"></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>Date</th><th class="fig">Agents</th><th class="fig">Sold</th>
+                 <th class="fig">Collected</th><th class="fig">Variance</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr><td>{{ h.day | day }}</td><td class="fig">{{ h.agents }}</td>
+            <td class="fig">{{ h.sold_qty | qty }}</td>
+            <td class="fig">{{ h.collection | money }}</td>
+            <td class="fig">{% if h.variance < 0 %}<span class="short-text">{{ h.variance | signed_money }}</span>
+                {% elif h.variance > 0 %}<span class="over-text">{{ h.variance | signed_money }}</span>
+                {% else %}0{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<div class="empty"><p>Nothing recorded at this site yet.</p></div>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Remove this building</h2></div>
+  <div class="card-body">
+    <p class="muted small" style="margin-top:0">
+      The site record goes. Agents posted here are unposted, not deleted, and
+      every day they have already traded stays exactly as it is.
+    </p>
+    <form method="post" action="{{ url_for('buildings.delete', building_id=building.id) }}"
+          onsubmit="return confirm('Remove {{ building.name }}?')">
+      {% if agents %}
+      <div class="field"><label class="check">
+        <input type="checkbox" name="force" value="1">
+        Yes, unpost the {{ agents | length }} agent(s) here and delete it</label></div>
+      {% endif %}
+      <button type="submit" class="btn danger">Delete building</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
